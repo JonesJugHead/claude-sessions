@@ -1,0 +1,35 @@
+{
+  "name": "claude-sessions",
+  "version": "1.0.0",
+  "description": "Local web UI to browse, search, rename, move, delete and resume Claude Code sessions across several config folders.",
+  "author": "JonesJugHead",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JonesJugHead/claude-sessions.git"
+  },
+  "bin": {
+    "claude-sessions": "claude-sessions.js"
+  },
+  "main": "claude-sessions.js",
+  "files": [
+    "claude-sessions.js",
+    "lib/",
+    "ui.html"
+  ],
+  "scripts": {
+    "start": "node claude-sessions.js",
+    "setup": "node claude-sessions.js --setup",
+    "test": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "sessions",
+    "transcripts",
+    "cli"
+  ]
+}

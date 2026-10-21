@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Sessions</title>
+<style>
+  :root{
+    --bg:#14161a; --surface:#1b1e25; --surface-2:#222630; --border:#2b303b;
+    --text:#e7eaf0; --muted:#8b93a3; --muted-2:#5f6675;
+    --accent:#6ba4ff; --lane:#6b7280;
+    --ok:#57c78a; --err:#ff6b6b;
+    --u-ok:#57c78a; --u-warn:#e0a95a; --u-bad:#ff6b6b;
+    --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,monospace;
+    --ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--ui);font-size:14px;
+    -webkit-font-smoothing:antialiased}
+
+  header{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg),var(--bg) 70%,transparent);
+    padding:18px 22px 12px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand h1{font-size:16px;font-weight:650;letter-spacing:.2px;margin:0}
+  .brand .tag{font-family:var(--mono);font-size:11px;color:var(--muted-2)}
+  .spacer{flex:1}
+  .search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);
+    border-radius:8px;padding:7px 11px;min-width:220px}
+  .search input{background:none;border:0;outline:0;color:var(--text);font-family:var(--ui);font-size:13px;width:100%}
+  .search svg{flex:0 0 auto;opacity:.5}
+  button.icon{background:var(--surface);border:1px solid var(--border);color:var(--muted);
+    border-radius:8px;padding:7px 12px;cursor:pointer;font-family:var(--ui);font-size:13px;display:flex;gap:7px;align-items:center}
+  button.icon:hover{color:var(--text);border-color:var(--muted-2)}
+
+  main{display:grid;grid-template-columns:repeat(var(--cols,3),1fr);gap:14px;padding:0 18px 22px;
+    height:calc(100vh - 66px)}
+  @media(max-width:900px){main{grid-template-columns:1fr;height:auto}}
+
+  .lane{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;
+    display:flex;flex-direction:column;min-height:0}
+  .lane-head{padding:13px 15px 12px;border-top:3px solid var(--lane);background:var(--surface-2);
+    display:flex;align-items:center;gap:10px}
+  .lane-head .dot{width:9px;height:9px;border-radius:50%;background:var(--lane);flex:0 0 auto;
+    box-shadow:0 0 10px -1px var(--lane)}
+  .lane-head .name{font-weight:640;font-size:14px}
+  .lane-head .cmd{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg);
+    border:1px solid var(--border);border-radius:5px;padding:2px 6px}
+  .lane-head .n{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted-2)}
+  .lane-body{overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px;min-height:60px}
+  .lane-body::-webkit-scrollbar{width:9px}
+  .lane-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px}
+
+  .lane-usage{padding:11px 15px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+  .urow{margin-bottom:9px}
+  .urow:last-child{margin-bottom:0}
+  .uhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+  .ulbl{font-size:11.5px;color:var(--muted)}
+  .upct{font-family:var(--mono);font-size:12px;font-weight:640}
+  .ubar{height:6px;border-radius:4px;background:var(--bg);overflow:hidden}
+  .ufill{height:100%;border-radius:4px;transition:width .3s}
+  .umeta{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);margin-top:9px;line-height:1.5}
+  .uempty{font-size:11.5px;color:var(--muted-2);line-height:1.5}
+  .ubtn{margin-top:7px;background:none;border:1px dashed var(--border);color:var(--muted);
+    border-radius:7px;padding:6px 10px;cursor:pointer;font-family:var(--ui);font-size:11.5px;width:100%}
+  .ubtn:hover{color:var(--text);border-color:var(--muted-2)}
+  .uinfo{cursor:help;color:var(--muted-2);font-size:10px;border:1px solid var(--border);border-radius:50%;
+    width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono)}
+
+  .empty{color:var(--muted-2);font-size:13px;text-align:center;padding:26px 12px;line-height:1.5}
+  .empty code{font-family:var(--mono);color:var(--muted);font-size:12px}
+
+  .card{background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--lane);
+    border-radius:9px;padding:11px 12px;transition:border-color .12s,transform .05s}
+  .card:hover{border-color:var(--muted-2);border-left-color:var(--lane)}
+  .card .title{font-size:13.5px;font-weight:560;line-height:1.35;margin:0 0 6px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:flex;align-items:center;
+    gap:6px;margin-bottom:8px;word-break:break-all}
+  .card .path svg{flex:0 0 auto;opacity:.55}
+  .card .path.none{color:var(--muted-2);font-style:italic}
+  .card .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .hash{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg);
+    border:1px solid var(--border);border-radius:5px;padding:2px 6px;cursor:pointer}
+  .hash:hover{color:var(--text);border-color:var(--muted-2)}
+  .meta .sub{font-size:11.5px;color:var(--muted-2)}
+
+  .hit{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;
+    color:var(--muted-2);margin:-3px 0 8px}
+  .hit .badge{color:#0b0d10;background:var(--lane);border-radius:5px;padding:1px 6px;font-weight:640;flex:0 0 auto}
+  .snippet{font-size:12px;line-height:1.45;color:var(--muted);background:var(--bg);
+    border:1px solid var(--border);border-left:2px solid var(--lane);border-radius:6px;
+    padding:7px 9px;margin:0 0 10px;word-break:break-word}
+  .snippet .role{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.4px;
+    color:var(--muted-2);display:block;margin-bottom:3px}
+  .snippet mark{background:rgba(107,164,255,.22);color:var(--text);border-radius:3px;padding:0 1px}
+
+  .qspin{width:13px;height:13px;flex:0 0 auto;border-radius:50%;border:2px solid var(--border);
+    border-top-color:var(--muted);animation:spin .7s linear infinite;display:none}
+  .qspin.on{display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .open{background:var(--lane);color:#0b0d10;border:0;border-radius:7px;padding:6px 13px;cursor:pointer;
+    font-family:var(--ui);font-weight:640;font-size:12.5px;display:flex;gap:6px;align-items:center}
+  .open:hover{filter:brightness(1.08)}
+  /* Shift held: [profile accent] -> red gradient drifting in a loop.
+     The tile is 220px wide and starts/ends on var(--lane), so the 220px
+     translation wraps around seamlessly. */
+  body.danger .open{
+    background-image:linear-gradient(100deg,
+      var(--lane) 0%, #ff5a5a 38%, #ff2f2f 50%, #ff5a5a 62%, var(--lane) 100%);
+    background-size:220px 100%;
+    animation:dangerSlide 2.6s linear infinite;
+    box-shadow:0 0 0 1px rgba(255,90,90,.55), 0 0 13px -3px rgba(255,70,70,.6);
+  }
+  @keyframes dangerSlide{from{background-position:0 0} to{background-position:220px 0}}
+  .move{display:flex;align-items:center;gap:5px;margin-left:auto}
+  .move .lbl{font-size:11px;color:var(--muted-2)}
+  .chip{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;
+    padding:4px 9px;cursor:pointer;font-family:var(--ui);font-size:11.5px}
+  .chip:hover{color:var(--text)}
+  .chip:hover{border-color:var(--lane);color:var(--lane)}
+  .del{background:none;border:1px solid var(--border);color:var(--muted-2);border-radius:7px;
+    padding:5px 7px;cursor:pointer;display:flex;align-items:center}
+  .del:hover{color:var(--err);border-color:var(--err);background:rgba(255,107,107,.09)}
+
+  #toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:20}
+  .toast{background:var(--surface-2);border:1px solid var(--border);border-left:3px solid var(--ok);
+    border-radius:8px;padding:10px 14px;font-size:13px;max-width:380px;box-shadow:0 8px 26px -12px #000;
+    animation:in .18s ease}
+  .toast.err{border-left-color:var(--err)}
+  .toast .mono{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px;word-break:break-all}
+  @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .loading{padding:60px;text-align:center;color:var(--muted-2)}
+
+  .card{cursor:pointer}
+  .card .title:hover{color:#fff}
+
+  /* ---- Conversation modal ---- */
+  .modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:28px}
+  .modal[hidden]{display:none}
+  .modal-backdrop{position:absolute;inset:0;background:rgba(6,7,10,.66);backdrop-filter:blur(3px);
+    animation:fade .16s ease}
+  .modal-panel{position:relative;width:min(920px,100%);height:min(88vh,900px);background:var(--surface);
+    border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden;
+    box-shadow:0 24px 70px -20px #000;animation:pop .18s cubic-bezier(.2,.8,.2,1)}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+
+  .modal-head{display:flex;align-items:center;gap:14px;padding:13px 15px;background:var(--surface-2);
+    border-bottom:1px solid var(--border);border-top:3px solid var(--lane,var(--lane))}
+  .mh-title{display:flex;align-items:center;gap:10px;min-width:0;flex:0 1 auto}
+  .mh-dot{width:9px;height:9px;border-radius:50%;background:var(--lane);flex:0 0 auto;box-shadow:0 0 10px -1px var(--lane)}
+  .mh-text{min-width:0}
+  .mh-name{font-weight:640;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+  .mh-path{font-family:var(--mono);font-size:11px;color:var(--muted-2);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:300px}
+  .modal-search{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);
+    border-radius:8px;padding:6px 9px;margin-left:auto;flex:1 1 220px;max-width:360px}
+  .modal-search svg{flex:0 0 auto;opacity:.5}
+  .modal-search input{background:none;border:0;outline:0;color:var(--text);font-family:var(--ui);font-size:13px;width:100%;min-width:40px}
+  .ms-count{font-family:var(--mono);font-size:11px;color:var(--muted-2);white-space:nowrap;flex:0 0 auto}
+  .ms-nav{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px;border-radius:5px;display:flex;flex:0 0 auto}
+  .ms-nav:hover:not(:disabled){color:var(--text);background:var(--surface-2)}
+  .ms-nav:disabled{opacity:.3;cursor:default}
+  .modal-close{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;
+    padding:6px;cursor:pointer;display:flex;flex:0 0 auto}
+  .modal-close:hover{color:var(--text);border-color:var(--muted-2)}
+
+  .modal-body{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+  .modal-body::-webkit-scrollbar{width:10px}
+  .modal-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px}
+  .modal-body .loading{padding:40px}
+
+  .msg{display:flex;flex-direction:column;gap:5px;max-width:100%}
+  .msg .who{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;
+    text-transform:uppercase;letter-spacing:.5px;color:var(--muted-2)}
+  .msg .who .rl{font-weight:640;padding:1px 7px;border-radius:5px}
+  .msg .when{font-size:10px;opacity:.7}
+  .msg .bubble{border:1px solid var(--border);border-radius:10px;padding:11px 13px;line-height:1.55;
+    font-size:13.5px;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+
+  .msg.human{align-items:flex-end}
+  .msg.human .bubble{background:var(--surface-2);border-left:3px solid var(--lane);max-width:82%}
+  .msg.human .rl{background:var(--lane);color:#0b0d10}
+
+  .msg.ai .bubble{background:var(--surface-2);border-left:3px solid #57c78a;max-width:88%}
+  .msg.ai .rl{background:#57c78a;color:#0b0d10}
+
+  .msg.tool{max-width:88%}
+  .msg.tool .rl{background:var(--border);color:var(--muted)}
+  .msg.tool .bubble{background:var(--bg);font-family:var(--mono);font-size:11.5px;color:var(--muted);
+    border-left:3px solid var(--muted-2);max-height:180px;overflow:auto}
+
+  .msg .tools{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+  .msg .toolcall{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--bg);
+    border:1px solid var(--border);border-radius:6px;padding:5px 8px;display:flex;align-items:center;gap:7px}
+  .msg .toolcall svg{flex:0 0 auto;opacity:.6}
+  .msg .toolcall b{color:var(--text);font-weight:600}
+
+  .modal-body mark{background:rgba(224,169,90,.28);color:#fff;border-radius:3px;padding:0 1px}
+  .modal-body mark.cur{background:#e0a95a;color:#0b0d10}
+
+  .modal-foot{padding:8px 16px;border-top:1px solid var(--border);background:var(--surface-2);
+    font-family:var(--mono);font-size:11px;color:var(--muted-2);display:flex;gap:14px;align-items:center}
+  .modal-foot .warn{color:var(--u-warn)}
+
+  .ren{background:none;border:1px solid var(--border);color:var(--muted-2);border-radius:7px;
+    padding:5px 7px;cursor:pointer;display:flex;align-items:center}
+  .ren:hover{color:var(--text);border-color:var(--muted-2);background:rgba(255,255,255,.05)}
+  /* title: discreet mark when renamed, greyed out when it is only the first
+     message because Claude has not generated a title yet */
+  .card .title .tmark{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-left:6px}
+  .card .title.raw{color:var(--muted);font-weight:520}
+  .mh-ren{background:none;border:1px solid var(--border);color:var(--muted-2);border-radius:7px;
+    padding:4px 6px;cursor:pointer;display:flex;align-items:center;flex:0 0 auto}
+  .mh-ren:hover{color:var(--text);border-color:var(--muted-2)}
+
+  /* ---- Rename popup ---- */
+  .cicon.edit{background:rgba(107,164,255,.13);color:var(--accent)}
+  .cbtn.go{background:var(--accent);border-color:var(--accent);color:#0b0d10}
+  .cbtn.go:hover{filter:brightness(1.08)}
+  .cbtn.ghost{margin-right:auto;color:var(--muted)}
+  .rinput{margin-top:12px;width:100%;background:var(--bg);border:1px solid var(--border);
+    border-radius:8px;padding:9px 11px;color:var(--text);font-family:var(--ui);font-size:13.5px;outline:0}
+  .rinput:focus{border-color:var(--accent)}
+
+  /* ---- Confirmation popup (replaces window.confirm) ---- */
+  .cmodal{z-index:40}
+  .cpanel{position:relative;width:min(460px,100%);background:var(--surface);border:1px solid var(--border);
+    border-radius:14px;padding:20px;box-shadow:0 24px 70px -20px #000;
+    animation:pop .16s cubic-bezier(.2,.8,.2,1);display:grid;grid-template-columns:auto 1fr;gap:14px}
+  .cicon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,107,107,.13);color:var(--err);flex:0 0 auto}
+  .cpanel h2{margin:3px 0 7px;font-size:15px;font-weight:640}
+  .cpanel p{margin:0;font-size:13px;color:var(--muted);line-height:1.55}
+  .cdetail{margin-top:11px;font-family:var(--mono);font-size:11.5px;color:var(--muted-2);background:var(--bg);
+    border:1px solid var(--border);border-radius:7px;padding:8px 10px;line-height:1.55;
+    white-space:pre-line;word-break:break-all}
+  .cdetail[hidden]{display:none}
+  .cactions{grid-column:2;display:flex;justify-content:flex-end;gap:8px;margin-top:17px}
+  .cbtn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:8px;
+    padding:8px 15px;cursor:pointer;font-family:var(--ui);font-size:13px;font-weight:560}
+  .cbtn:hover{border-color:var(--muted-2)}
+  .cbtn.danger{background:var(--err);border-color:var(--err);color:#1c0708}
+  .cbtn.danger:hover{filter:brightness(1.08)}
+</style>
+
+<header>
+  <div class="brand">
+    <h1>Claude Sessions</h1>
+    <span class="tag" id="totals"></span>
+    <span class="uinfo" title="Usage: read by running `<command> --print /usage` for each profile (it takes a few seconds). Cached for 5 min on the server; the Refresh button forces a new read.">i</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="search">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+    <input id="q" placeholder="Filter by title, path, id or message content..." autocomplete="off">
+    <span id="qspin" class="qspin" title="Searching messages..."></span>
+  </div>
+  <button class="icon" id="refresh">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v4h-4"/></svg>
+    Refresh
+  </button>
+</header>
+
+<main id="board"><div class="loading">Loading sessions...</div></main>
+<div id="toasts"></div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div class="mh-title">
+        <span class="mh-dot"></span>
+        <div class="mh-text">
+          <div class="mh-name" id="mTitle">Conversation</div>
+          <div class="mh-path" id="mPath"></div>
+        </div>
+        <button class="mh-ren" id="mRename" title="Rename session">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l10-10a2.8 2.8 0 1 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>
+        </button>
+      </div>
+      <div class="modal-search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input id="mQ" placeholder="Search the conversation..." autocomplete="off">
+        <span class="ms-count" id="mCount"></span>
+        <button class="ms-nav" id="mPrev" title="Previous (Shift+Enter)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m18 15-6-6-6 6"/></svg>
+        </button>
+        <button class="ms-nav" id="mNext" title="Next (Enter)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+      <button class="modal-close" id="mClose" title="Close (Esc)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="mBody"></div>
+    <div class="modal-foot" id="mFoot"></div>
+  </div>
+</div>
+
+<div id="confirm" class="modal cmodal" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="cpanel" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+    <div class="cicon">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 9v5M12 17.5v.5"/><path d="M10.3 3.9 2.6 17.2A1.9 1.9 0 0 0 4.3 20h15.4a1.9 1.9 0 0 0 1.7-2.8L13.7 3.9a1.9 1.9 0 0 0-3.4 0z"/></svg>
+    </div>
+    <div>
+      <h2 id="cTitle">Confirm?</h2>
+      <p id="cMsg"></p>
+      <div class="cdetail" id="cDetail" hidden></div>
+    </div>
+    <div class="cactions">
+      <button class="cbtn" id="cCancel">Cancel</button>
+      <button class="cbtn danger" id="cOk">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="rename" class="modal cmodal" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="cpanel" role="dialog" aria-modal="true" aria-labelledby="rTitle">
+    <div class="cicon edit">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l10-10a2.8 2.8 0 1 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>
+    </div>
+    <div>
+      <h2 id="rTitle">Rename session</h2>
+      <p id="rMsg">The title is written to the transcript, just like a rename from Claude Code: it replaces the title Claude generated.</p>
+      <input id="rInput" class="rinput" maxlength="200" autocomplete="off" spellcheck="false" placeholder="Session title">
+      <div class="cdetail" id="rDetail" hidden></div>
+    </div>
+    <div class="cactions">
+      <button class="cbtn ghost" id="rAuto" hidden>Claude's title</button>
+      <button class="cbtn" id="rCancel">Cancel</button>
+      <button class="cbtn go" id="rOk">Rename</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let STATE = { profiles:[], sessions:{}, dangerFlag:'' };
+const accentOf = p => (p && p.color) || 'var(--lane)';
+let FILTER = '';
+let CONTENT = {};        // full-text search results: { profile: { id: {count,snippet,role} } }
+let CONTENT_Q = '';      // query that CONTENT matches
+
+const $ = (s,r=document)=>r.querySelector(s);
+const el = (t,c)=>{const e=document.createElement(t); if(c) e.className=c; return e;};
+const esc = s => (s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+function rel(ms){
+  if(!ms) return '';
+  const s=Math.round((Date.now()-ms)/1000);
+  if(s<60) return "just now";
+  const m=Math.round(s/60); if(m<60) return m+" min ago";
+  const h=Math.round(m/60); if(h<24) return h+" h ago";
+  const d=Math.round(h/24); if(d<30) return d+" d ago";
+  const mo=Math.round(d/30); if(mo<12) return mo+" mo ago";
+  return Math.round(mo/12)+" y ago";
+}
+
+function toast(msg, sub, isErr){
+  const t = el('div','toast'+(isErr?' err':''));
+  t.innerHTML = esc(msg) + (sub?'<span class="mono">'+esc(sub)+'</span>':'');
+  $('#toasts').appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),250); }, isErr?5200:3400);
+}
+
+let ULOADING = false;
+
+async function load(forceUsage){
+  const r = await fetch('/api/sessions');
+  STATE = await r.json();
+  render();
+  // the server deletes the transcripts left by `--print /usage` on every scan
+  if(STATE.purged) toast(STATE.purged+(STATE.purged>1?' /usage sessions deleted':' /usage session deleted'),
+                         'automatic cleanup');
+  loadUsage(!!forceUsage);
+}
+
+async function loadUsage(force){
+  if(ULOADING) return;
+  ULOADING = true; render();
+  try{
+    const r = await fetch('/api/usage'+(force?'?refresh=1':''));
+    const u = await r.json();
+    for(const p of STATE.profiles) if(u[p.key]) p.usage = u[p.key];
+  }catch(e){ toast('Usage unavailable', String(e.message||e), true); }
+  ULOADING = false; render();
+}
+
+function contentHit(s){
+  return (CONTENT[s.profile] && CONTENT[s.profile][s.id]) || null;
+}
+
+function matches(s){
+  if(!FILTER) return true;
+  const f=FILTER.toLowerCase();
+  if((s.title||'').toLowerCase().includes(f)
+      || (s.cwd||s.project||'').toLowerCase().includes(f)
+      || (s.id||'').toLowerCase().includes(f)) return true;
+  // otherwise, match on message content (once the full-text search answered)
+  return CONTENT_Q === FILTER && !!contentHit(s);
+}
+
+// Server-side full-text search, debounced. A token discards stale answers.
+let SEARCH_TOKEN = 0;
+let SEARCH_TIMER = null;
+function scheduleSearch(){
+  clearTimeout(SEARCH_TIMER);
+  const q = FILTER;
+  if(!q){ CONTENT = {}; CONTENT_Q = ''; $('#qspin').classList.remove('on'); render(); return; }
+  if(CONTENT_Q === q){ render(); return; }      // already up to date
+  $('#qspin').classList.add('on');
+  SEARCH_TIMER = setTimeout(async ()=>{
+    const token = ++SEARCH_TOKEN;
+    try{
+      const r = await fetch('/api/search?q='+encodeURIComponent(q));
+      const d = await r.json();
+      if(token !== SEARCH_TOKEN) return;          // a more recent keystroke took over
+      CONTENT = d.results || {};
+      CONTENT_Q = q;                              // these results match the current term
+    }catch(e){
+      if(token === SEARCH_TOKEN){ CONTENT = {}; CONTENT_Q = ''; toast('Search unavailable', String(e.message||e), true); }
+    }finally{
+      if(token === SEARCH_TOKEN) $('#qspin').classList.remove('on');
+      render();
+    }
+  }, 220);
+}
+
+function highlight(text, term){
+  const t = esc(text);
+  if(!term) return t;
+  const i = text.toLowerCase().indexOf(term.toLowerCase());
+  if(i === -1) return t;
+  // highlight every occurrence, on the already escaped text
+  const et = esc(term);
+  const re = new RegExp(et.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+  return t.replace(re, m=>'<mark>'+m+'</mark>');
+}
+
+// Where the displayed title comes from (sent by the server in titleSource).
+const TITLE_HINT = {
+  custom : 'Renamed by hand (pencil to change it)',
+  ai     : 'Generated by Claude (pencil to rename)',
+  summary: 'Summary from the older transcript format (pencil to rename)',
+  first  : 'No generated title yet: first message of the session',
+  none   : 'Untitled session',
+};
+
+function card(s, profile){
+  const accent = accentOf(profile);
+  const c = el('article','card');
+  c.style.setProperty('--lane', accent);
+  c.onclick = ()=>openConversation(s, profile);
+
+  const title = el('p','title'+(s.titleSource==='first'||s.titleSource==='none' ? ' raw' : ''));
+  title.textContent = s.title;
+  title.title = s.title + '\n\n' + TITLE_HINT[s.titleSource||'none'];
+  if(s.titleSource==='custom'){
+    const mark = el('span','tmark'); mark.textContent = 'renamed'; title.appendChild(mark);
+  }
+  c.appendChild(title);
+
+  const path = el('div','path'+(s.cwd?'':' none'));
+  path.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+  path.appendChild(document.createTextNode(s.cwd || (s.project + '  (path not read)')));
+  c.appendChild(path);
+
+  const meta = el('div','meta');
+  const hash = el('span','hash'); hash.textContent = '#'+s.id.slice(0,8);
+  hash.title = 'Click to copy: '+s.id;
+  hash.onclick = (e)=>{ e.stopPropagation(); navigator.clipboard.writeText(s.id); toast('Id copied', s.id); };
+  meta.appendChild(hash);
+  const sub = el('span','sub');
+  sub.textContent = rel(s.mtime) + (s.count>0 ? '  -  '+s.count+' msg' : '');
+  meta.appendChild(sub);
+  c.appendChild(meta);
+
+  // full-text search excerpt, if this session matches by its content
+  const hit = FILTER && CONTENT_Q === FILTER ? contentHit(s) : null;
+  if(hit){
+    const h = el('div','hit');
+    const badge = el('span','badge');
+    badge.textContent = hit.count + (hit.count>1 ? ' messages' : ' message');
+    h.appendChild(badge);
+    const cap = el('span'); cap.textContent = (hit.count>1 ? 'contain' : 'contains')+' "'+FILTER+'"';
+    h.appendChild(cap);
+    c.appendChild(h);
+    if(hit.snippet){
+      const sn = el('div','snippet');
+      const role = el('span','role'); role.textContent = hit.role==='assistant' ? 'AI' : 'Human';
+      sn.appendChild(role);
+      const body = el('span');
+      body.innerHTML = highlight(hit.snippet, FILTER);
+      sn.appendChild(body);
+      c.appendChild(sn);
+    }
+  }
+
+  const actions = el('div','actions');
+  const open = el('button','open');
+  open.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 8 4 4-4 4M13 16h5"/></svg>Open';
+  open.title = 'Resume the session in a terminal' + (STATE.dangerFlag ? ' (Shift: + '+STATE.dangerFlag+')' : '');
+  open.onclick = (e)=>{ e.stopPropagation(); doOpen(s, profile, e.shiftKey && !!STATE.dangerFlag); };
+  actions.appendChild(open);
+
+  const move = el('div','move');
+  const lbl = el('span','lbl'); lbl.textContent = 'move to'; move.appendChild(lbl);
+  for(const p of STATE.profiles){
+    if(p.key===profile.key) continue;
+    const chip = el('button','chip'); chip.style.setProperty('--lane', accentOf(p)); chip.textContent = p.label;
+    chip.onclick = (e)=>{ e.stopPropagation(); doMove(s, profile, p); };
+    move.appendChild(chip);
+  }
+  actions.appendChild(move);
+
+  const ren = el('button','ren');
+  ren.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l10-10a2.8 2.8 0 1 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>';
+  ren.title = 'Rename session';
+  ren.setAttribute('aria-label','Rename session');
+  ren.onclick = (e)=>{ e.stopPropagation(); doRename(s, profile); };
+  actions.appendChild(ren);
+
+  const del = el('button','del');
+  del.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
+  del.title = 'Permanently delete this session';
+  del.setAttribute('aria-label','Delete session');
+  del.onclick = (e)=>{ e.stopPropagation(); doDelete(s, profile); };
+  actions.appendChild(del);
+
+  c.appendChild(actions);
+  return c;
+}
+
+const U_LABELS = { 'Current session':'Session (5h)', 'Current week (all models)':'Week (all models)' };
+const U_SHORT  = { 'Current session':'5h', 'Current week (all models)':'7d' };
+function ulabel(l){
+  if(U_LABELS[l]) return U_LABELS[l];
+  const m = l.match(/^Current week \((.+)\)$/i);
+  return m ? 'Week ('+m[1]+')' : l.replace(/^Current\s+/i,'');
+}
+function ucolor(p){ return p>=85?'var(--u-bad)':p>=60?'var(--u-warn)':'var(--u-ok)'; }
+function shortReset(s){ return (s||'').replace(/\s*\([^)]*\)\s*$/,''); }  // drops the time zone
+
+// ---- Usage line timing -----------------------------------------------------
+// Age of the last /usage: "0s", "30s", "4 min", "10h02". Second granularity
+// under a minute, since the ticker refreshes every 30 s.
+function ago(ts){
+  const s = Math.max(0, Math.round((Date.now()-ts)/1000));
+  if(s<60) return s+'s';
+  const m = Math.floor(s/60);
+  if(m<60) return m+' min';
+  return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0');
+}
+
+// Remaining time: "2h25", "48 min", "< 1 min".
+function dur(ms){
+  const m = Math.floor(ms/60000);
+  if(m<1)  return '< 1 min';
+  if(m<60) return m+' min';
+  return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0');
+}
+
+const MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+
+// "Jul 29, 12:49am (Europe/Paris)" -> local Date. Minutes are sometimes omitted
+// ("Aug 4, 7pm"). Claude does not print the year: take the closest occurrence,
+// which handles the December -> January rollover.
+function parseReset(s){
+  const m = String(s||'').match(/([A-Za-z]{3,})\s+(\d{1,2})[,\s]+(\d{1,2})(?::(\d{2}))?\s*([ap]m)?/i);
+  if(!m) return null;
+  const mo = MONTHS[m[1].slice(0,3).toLowerCase()];
+  if(mo === undefined) return null;
+  const ap = (m[5]||'').toLowerCase();
+  if(!ap && m[4] === undefined) return null;   // neither minutes nor am/pm: not a time
+  let h = parseInt(m[3],10);
+  if(ap==='pm' && h<12) h += 12;
+  if(ap==='am' && h===12) h = 0;
+  if(h > 23) return null;
+  const mn = m[4] === undefined ? 0 : parseInt(m[4],10), day = parseInt(m[2],10);
+  const now = new Date(), HALF = 182*864e5;
+  let d = new Date(now.getFullYear(), mo, day, h, mn);
+  if(d-now >  HALF) d = new Date(now.getFullYear()-1, mo, day, h, mn);
+  if(now-d >  HALF) d = new Date(now.getFullYear()+1, mo, day, h, mn);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Line "updated 30s ago | 5h -> 2h25 left | 7d -> Jul 29, 5:59pm".
+// 5h: always as remaining time. 7d: remaining time only under 24 h, beyond
+// that the absolute date is easier to read.
+function usageMeta(u){
+  const bits = ['updated '+ago(u.ts)+' ago'], tips = [];
+  for(const r of u.rows){
+    const s = U_SHORT[r.label];
+    if(!s || !r.resets) continue;
+    const d  = parseReset(r.resets);
+    const ms = d ? d - Date.now() : null;
+    let txt;
+    if(ms === null)              txt = shortReset(r.resets);   // unreadable date: keep it raw
+    else if(ms <= 0)             txt = 'reset passed';
+    else if(s==='5h' || ms<864e5) txt = dur(ms)+' left';
+    else                         txt = shortReset(r.resets);
+    bits.push(s+' -> '+txt);
+    tips.push(s+': resets '+shortReset(r.resets));
+  }
+  if(ULOADING) bits.push('updating...');
+  return { text: bits.join('  |  '), title: tips.join('\n') };
+}
+
+// The displayed time ages on its own: recompute it every 30 s without calling
+// /usage again (the call is slow and uses quota).
+function refreshUsageMeta(){
+  for(const meta of document.querySelectorAll('.umeta[data-pkey]')){
+    const p = STATE.profiles.find(x=>x.key===meta.dataset.pkey);
+    if(!p || !p.usage || !p.usage.ok) continue;
+    const m = usageMeta(p.usage);
+    meta.textContent = m.text;
+    meta.title = m.title;
+  }
+}
+setInterval(refreshUsageMeta, 30000);
+
+function usageBlock(profile){
+  const box = el('div','lane-usage');
+  if(!profile.exists){ box.style.display='none'; return box; }
+  const u = profile.usage;
+  if(!u){
+    const e=el('div','uempty');
+    e.textContent = ULOADING
+      ? 'Reading usage ('+profile.cmd+' --print /usage)...'
+      : 'Usage unavailable.';
+    box.appendChild(e);
+    if(!ULOADING){
+      const b=el('button','ubtn'); b.textContent='Retry'; b.onclick=()=>loadUsage(true);
+      box.appendChild(b);
+    }
+    return box;
+  }
+  if(!u.ok){
+    const e=el('div','uempty'); e.textContent='Usage error: '+(u.error||'unknown');
+    const b=el('button','ubtn'); b.textContent='Retry'; b.onclick=()=>loadUsage(true);
+    box.appendChild(e); box.appendChild(b);
+    return box;
+  }
+  for(const r of u.rows){
+    const p = Math.round(r.pct);
+    const row=el('div','urow');
+    const head=el('div','uhead');
+    const lbl=el('span','ulbl'); lbl.textContent = ulabel(r.label);
+    if(r.resets) lbl.title = 'Resets: '+r.resets;
+    const pc=el('span','upct'); pc.textContent = p+'%'; pc.style.color=ucolor(p);
+    head.appendChild(lbl); head.appendChild(pc);
+    const bar=el('div','ubar'); const fill=el('div','ufill');
+    fill.style.width=Math.min(p,100)+'%'; fill.style.background=ucolor(p);
+    bar.appendChild(fill);
+    row.appendChild(head); row.appendChild(bar);
+    box.appendChild(row);
+  }
+  const meta=el('div','umeta');
+  meta.dataset.pkey = profile.key;        // marker for the ticker (refreshUsageMeta)
+  const m = usageMeta(u);
+  meta.textContent = m.text;
+  meta.title = m.title;
+  box.appendChild(meta);
+  return box;
+}
+
+function render(){
+  const board = $('#board');
+  board.innerHTML = '';
+  board.style.setProperty('--cols', STATE.profiles.length);
+
+  let total=0, shown=0;
+  for(const p of STATE.profiles){
+    const list = (STATE.sessions[p.key]||[]);
+    total += list.length;
+    const accent = accentOf(p);
+
+    const lane = el('div','lane');
+    const head = el('div','lane-head'); head.style.setProperty('--lane', accent);
+    head.innerHTML =
+      '<span class="dot"></span><span class="name">'+esc(p.label)+'</span>'+
+      '<span class="cmd">'+esc(p.cmd)+'</span>';
+    const n = el('span','n'); head.appendChild(n);
+    lane.appendChild(head);
+    lane.appendChild(usageBlock(p));
+
+    const body = el('div','lane-body');
+    const visible = list.filter(matches);
+    shown += visible.length;
+    n.textContent = FILTER ? visible.length+'/'+list.length : list.length;
+
+    if(!p.exists){
+      const e = el('div','empty');
+      e.innerHTML = 'Folder not found<br><code>'+esc(p.dir)+'</code><br>Fix it with <code>--setup</code> or in <code>'+esc(STATE.configPath||'config.json')+'</code>';
+      body.appendChild(e);
+    } else if(visible.length===0){
+      const e = el('div','empty');
+      e.textContent = FILTER ? 'No result here.' : 'No session.';
+      body.appendChild(e);
+    } else {
+      for(const s of visible) body.appendChild(card(s, p));
+    }
+    lane.appendChild(body);
+    board.appendChild(lane);
+  }
+  $('#totals').textContent = total+' sessions'+(FILTER?'  -  '+shown+' shown':'');
+}
+
+async function doOpen(s, profile, danger){
+  try{
+    const r = await fetch('/api/open',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:s.id, profile:profile.key, danger:!!danger})});
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error);
+    toast('Terminal opened ('+profile.label+')'+(danger?'  -  '+STATE.dangerFlag:''),
+          (d.cwd?'cd '+d.cwd+'  &&  ':'')+d.cmd);
+  }catch(e){ toast('Could not open', String(e.message||e), true); }
+}
+
+// ---- Danger mode: Shift held ----------------------------------------------
+// Turns .danger on <body> (CSS of the "Open" button). The flag sent to the
+// server comes from e.shiftKey at click time, not from this state: a stuck
+// class can never trigger the flag.
+function setDanger(on){ document.body.classList.toggle('danger', on && !!STATE.dangerFlag); }
+document.addEventListener('keydown', e=>{ if(e.key==='Shift') setDanger(true); });
+document.addEventListener('keyup',   e=>{ if(e.key==='Shift') setDanger(false); });
+document.addEventListener('mousemove', e=>setDanger(e.shiftKey));   // resync if Shift was pressed out of focus
+window.addEventListener('blur', ()=>setDanger(false));              // alt-tab: otherwise the red stays on
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) setDanger(false); });
+
+// ---- Confirmation popup ---------------------------------------------------
+// Same look as the rest of the UI (window.confirm is blocking and ugly), and
+// the default focus goes to "Cancel": never to the destructive button.
+let CONFIRM_RESOLVE = null;
+
+function askConfirm({ title, message, detail, ok='Confirm' }){
+  $('#cTitle').textContent = title;
+  $('#cMsg').textContent = message;
+  const d = $('#cDetail');
+  d.textContent = detail || '';
+  d.hidden = !detail;
+  $('#cOk').textContent = ok;
+  $('#confirm').hidden = false;
+  $('#cCancel').focus();
+  return new Promise(res => { CONFIRM_RESOLVE = res; });
+}
+
+function closeConfirm(v){
+  $('#confirm').hidden = true;
+  const r = CONFIRM_RESOLVE; CONFIRM_RESOLVE = null;
+  if(r) r(v);
+}
+
+$('#cOk').addEventListener('click', ()=>closeConfirm(true));
+$('#cCancel').addEventListener('click', ()=>closeConfirm(false));
+$('#confirm .modal-backdrop').addEventListener('click', ()=>closeConfirm(false));
+document.addEventListener('keydown', e=>{
+  if(!$('#confirm').hidden && e.key==='Escape'){ e.preventDefault(); closeConfirm(false); }
+});
+
+// ---- Rename popup ---------------------------------------------------------
+// Claude Code stores the title in the transcript itself: an "ai-title" line for
+// the one it generates, a "custom-title" line when renamed. Renaming here means
+// writing that same line (server side), so the CLI picks it up as-is the next
+// time the session is resumed.
+let RENAME_RESOLVE = null;
+
+function askRename(s){
+  const inp = $('#rInput');
+  const cur = s.customTitle || (s.titleSource === 'ai' ? s.aiTitle : '') || '';
+  inp.value = cur;
+  const auto = $('#rAuto');
+  auto.hidden = !s.aiTitle || s.aiTitle === cur;
+  auto.onclick = ()=>{ inp.value = s.aiTitle; inp.focus(); inp.select(); };
+  const d = $('#rDetail');
+  d.textContent = '#' + s.id + (s.cwd ? '\n' + s.cwd : '')
+                + (s.aiTitle ? '\nClaude\'s title: ' + s.aiTitle : '');
+  d.hidden = false;
+  $('#rename').hidden = false;
+  inp.focus(); inp.select();
+  return new Promise(res => { RENAME_RESOLVE = res; });
+}
+
+function closeRename(v){
+  $('#rename').hidden = true;
+  const r = RENAME_RESOLVE; RENAME_RESOLVE = null;
+  if(r) r(v);
+}
+
+$('#rOk').addEventListener('click', ()=>closeRename($('#rInput').value.trim()));
+$('#rCancel').addEventListener('click', ()=>closeRename(null));
+$('#rename .modal-backdrop').addEventListener('click', ()=>closeRename(null));
+$('#rInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter'){ e.preventDefault(); closeRename($('#rInput').value.trim()); }
+});
+document.addEventListener('keydown', e=>{
+  if(!$('#rename').hidden && e.key === 'Escape'){ e.preventDefault(); closeRename(null); }
+});
+
+async function doRename(s, profile){
+  const next = await askRename(s);
+  if(next === null) return;                       // Cancel / Esc
+  if(!next){ toast('Empty title', 'rename cancelled', true); return; }
+  if(next === s.title) return;
+  try{
+    const r = await fetch('/api/rename',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:s.id, profile:profile.key, title:next})});
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error);
+    // optimistic update: the object comes from STATE, the card re-renders
+    s.title = d.title; s.customTitle = d.title; s.titleSource = 'custom';
+    render();
+    if(!$('#modal').hidden && MODAL.s && MODAL.s.id === s.id) $('#mTitle').textContent = d.title;
+    toast('Session renamed', d.title);
+  }catch(e){ toast('Could not rename', String(e.message||e), true); }
+}
+
+async function doDelete(s, profile){
+  const ok = await askConfirm({
+    title: 'Delete this session?',
+    message: 'The transcript and its side files (todos, env, file history) will be erased '
+           + 'from the ' + profile.label + ' profile. This cannot be undone.',
+    detail: s.title + '\n#' + s.id + (s.cwd ? '\n' + s.cwd : ''),
+    ok: 'Delete',
+  });
+  if(!ok) return;
+  try{
+    const r = await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:s.id, profile:profile.key})});
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error);
+    // optimistic removal: no reload, the card disappears right away
+    STATE.sessions[profile.key] = (STATE.sessions[profile.key]||[]).filter(x=>x.id!==s.id);
+    render();
+    toast('Session deleted ('+profile.label+')', s.title);
+  }catch(e){ toast('Could not delete', String(e.message||e), true); }
+}
+
+async function doMove(s, from, to){
+  try{
+    const r = await fetch('/api/move',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:s.id, from:from.key, to:to.key})});
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error);
+    // optimistic removal, then refresh
+    STATE.sessions[from.key] = STATE.sessions[from.key].filter(x=>x.id!==s.id);
+    render();
+    toast(from.label+' -> '+to.label, s.title);
+    load();
+  }catch(e){ toast('Could not move', String(e.message||e), true); }
+}
+
+// ---- Modal: reading a full conversation -----------------------------------
+let MODAL = { msgs:[], bubbles:[], marks:[], cur:-1 };
+const REL_LABEL = { human:'You', ai:'Claude', tool:'Tool' };
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+function fmtTime(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleString(undefined,{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+async function openConversation(s, profile){
+  const accent = accentOf(profile);
+  MODAL = { msgs:[], bubbles:[], marks:[], cur:-1, s, profile };
+  const modal = $('#modal');
+  modal.style.setProperty('--lane', accent);
+  $('#mTitle').textContent = s.title;
+  $('#mPath').textContent = s.cwd || s.project || '';
+  $('#mQ').value = '';
+  $('#mCount').textContent = '';
+  $('#mBody').innerHTML = '<div class="loading">Loading conversation...</div>';
+  $('#mFoot').textContent = '';
+  updateNav();
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+  try{
+    const r = await fetch('/api/conversation?profile='+encodeURIComponent(profile.key)+'&id='+encodeURIComponent(s.id));
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error);
+    MODAL.msgs = d.msgs || [];
+    renderConversation(d);
+    $('#mQ').focus();
+  }catch(e){
+    $('#mBody').innerHTML = '';
+    const err = el('div','empty'); err.textContent = 'Could not read the conversation: '+(e.message||e);
+    $('#mBody').appendChild(err);
+  }
+}
+
+function toolIcon(){
+  return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 5.5a3.5 3.5 0 0 1-4.6 4.6L5 15v4h4l4.9-4.9a3.5 3.5 0 0 0 4.6-4.6l-2 2-2.5-.5-.5-2.5z"/></svg>';
+}
+
+function renderConversation(d){
+  const body = $('#mBody');
+  body.innerHTML = '';
+  MODAL.bubbles = [];
+  if(!MODAL.msgs.length){
+    const e = el('div','empty'); e.textContent = 'No readable message in this session.';
+    body.appendChild(e);
+    $('#mFoot').textContent = '0 messages'; return;
+  }
+  for(const m of MODAL.msgs){
+    const wrap = el('div','msg '+m.role);
+    const who = el('div','who');
+    const rl = el('span','rl'); rl.textContent = REL_LABEL[m.role]||m.role; who.appendChild(rl);
+    if(m.ts){ const w=el('span','when'); w.textContent = fmtTime(m.ts); who.appendChild(w); }
+    wrap.appendChild(who);
+    if(m.text){
+      const b = el('div','bubble'); b.textContent = m.text;
+      MODAL.bubbles.push({ el:b, text:m.text });
+      wrap.appendChild(b);
+    }
+    if(m.tools && m.tools.length){
+      const tc = el('div','tools');
+      for(const t of m.tools){
+        const line = el('div','toolcall'); line.innerHTML = toolIcon();
+        const idx = t.indexOf(' - ');
+        const nm = el('b'); nm.textContent = idx>-1 ? t.slice(0,idx) : t; line.appendChild(nm);
+        if(idx>-1) line.appendChild(document.createTextNode(t.slice(idx)));
+        tc.appendChild(line);
+      }
+      wrap.appendChild(tc);
+    }
+    body.appendChild(wrap);
+  }
+  const foot = $('#mFoot'); foot.innerHTML = '';
+  const c = el('span'); c.textContent = MODAL.msgs.length+' messages'; foot.appendChild(c);
+  if(d.truncated){ const w=el('span','warn'); w.textContent='conversation truncated (very large file)'; foot.appendChild(w); }
+}
+
+function runModalSearch(){
+  const q = $('#mQ').value.trim();
+  const ql = q.toLowerCase();
+  MODAL.marks = [];
+  for(const b of MODAL.bubbles){
+    if(q && b.text.toLowerCase().includes(ql)){
+      const re = new RegExp(escRe(esc(q)),'gi');
+      b.el.innerHTML = esc(b.text).replace(re, m=>'<mark>'+m+'</mark>');
+    } else if(b.el.querySelector('mark')){
+      b.el.textContent = b.text;
+    }
+  }
+  if(q) MODAL.marks = Array.from($('#mBody').querySelectorAll('mark'));
+  MODAL.cur = MODAL.marks.length ? 0 : -1;
+  focusMark(false);
+  updateNav();
+}
+
+function focusMark(scroll=true){
+  MODAL.marks.forEach(m=>m.classList.remove('cur'));
+  const m = MODAL.marks[MODAL.cur];
+  if(m){ m.classList.add('cur'); if(scroll) m.scrollIntoView({block:'center',behavior:'smooth'}); }
+}
+
+function stepMark(dir){
+  if(!MODAL.marks.length) return;
+  MODAL.cur = (MODAL.cur + dir + MODAL.marks.length) % MODAL.marks.length;
+  focusMark(); updateNav();
+}
+
+function updateNav(){
+  const n = MODAL.marks.length, q = $('#mQ').value.trim();
+  $('#mCount').textContent = !q ? '' : (n ? (MODAL.cur+1)+'/'+n : 'none');
+  $('#mPrev').disabled = n<2; $('#mNext').disabled = n<2;
+}
+
+function closeModal(){
+  $('#modal').hidden = true;
+  document.body.style.overflow = '';
+  MODAL = { msgs:[], bubbles:[], marks:[], cur:-1, s:null, profile:null };
+}
+
+let MSEARCH_TIMER = null;
+$('#mQ').addEventListener('input', ()=>{ clearTimeout(MSEARCH_TIMER); MSEARCH_TIMER = setTimeout(runModalSearch, 120); });
+$('#mQ').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); stepMark(e.shiftKey?-1:1); }
+});
+$('#mPrev').addEventListener('click', ()=>stepMark(-1));
+$('#mNext').addEventListener('click', ()=>stepMark(1));
+$('#mRename').addEventListener('click', ()=>{ if(MODAL.s && MODAL.profile) doRename(MODAL.s, MODAL.profile); });
+$('#mClose').addEventListener('click', closeModal);
+$('.modal-backdrop').addEventListener('click', closeModal);
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && $('#confirm').hidden && $('#rename').hidden && !$('#modal').hidden) closeModal();
+});
+
+$('#q').addEventListener('input', e=>{ FILTER = e.target.value.trim(); render(); scheduleSearch(); });
+$('#refresh').addEventListener('click', ()=>load(true));
+load();
+</script>
